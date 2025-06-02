@@ -1,0 +1,51 @@
+# Use the official Miniconda3 image (built on Ubuntu) to avoid manual Miniconda install
+FROM continuumio/miniconda3:latest
+
+# Prevent interactive prompts during package installs
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies:
+#   - git, curl, build-essential, swig (for pystare)
+#   - libpq-dev (for psycopg2)
+#   - gdal, geos, proj (for geopandas/rasterio)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      git \
+      curl \
+      build-essential \
+      libpq-dev \
+      gdal-bin \
+      libgdal-dev \
+      libgeos-dev \
+      libproj-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install SWIG and wheel via conda (from conda-forge)
+RUN conda install -c conda-forge swig wheel -y
+
+# Install stare
+RUN conda install -c conda-forge stare
+
+# Ensure conda is up to date
+RUN conda update -n base -c defaults conda -y
+
+# Install pyhdf (required by pystare) from conda-forge
+RUN conda install -c conda-forge pyhdf -y
+
+# Install pystare from PyPI
+RUN pip install pystare
+
+# Install starepandas from PyPI
+RUN pip install starepandas
+
+# Install staremaster from PyPI
+RUN pip install staremaster
+
+# (Optional) Verify installation by printing versions
+RUN python -c "import pystare, starepandas; print('pystare:', pystare.__version__); print('starepandas:', starepandas.__version__)"
+
+# Set working directory
+WORKDIR /workspace
+
+# Default command: open a bash shell
+CMD ["/bin/bash"]
