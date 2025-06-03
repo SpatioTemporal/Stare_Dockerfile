@@ -1,0 +1,111 @@
+## Use an AMD64 Python 3.12 slim base (Bullseye)
+#FROM --platform=linux/amd64 python:3.12-slim-bullseye
+# Use an ARM64 Ubuntu base image (will run on Mac M1)
+FROM ubuntu:20.04
+
+# Prevent interactive prompts during package installs
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies (including wget + bzip2)
+#   - wget, bzip2 (for downloading/unpacking Miniconda)
+#   - git, curl, build-essential, swig (for pystare build)
+#   - libpq-dev (for psycopg2)
+#   - gdal, geos, proj (for geopandas/rasterio)
+#   - cmake, doxygen (for any CMake‐based builds or documentation)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      wget \
+      bzip2 \
+      git \
+      curl \
+      build-essential \
+      libpq-dev \
+      gdal-bin \
+      libgdal-dev \
+      libgeos-dev \
+      libproj-dev \
+      cmake \
+      doxygen && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install coreutils (md5sum) and symlink it as "md5"
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends coreutils && \
+    ln -s /usr/bin/md5sum /usr/bin/md5
+
+# Download and install Miniconda3 for ARM64
+RUN wget --no-check-certificate https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh \
+          -O /tmp/miniconda.sh && \
+    bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm /tmp/miniconda.sh
+
+# Add conda to PATH
+ENV PATH=/opt/conda/bin:$PATH
+
+# Ensure conda is up to date
+RUN conda update -n base -c defaults conda -y
+
+# Install SWIG and wheel via conda-forge
+RUN conda install -c conda-forge setuptools swig wheel -y
+
+# Install pyhdf (required by pystare) from conda-forge
+RUN conda install -c conda-forge pyhdf -y
+
+# Install cmake
+RUN conda install -c conda-forge cmake
+
+# Install doxygen
+RUN conda install -c conda-forge doxygen
+
+#Install stare from source
+RUN git -c http.sslVerify=false clone https://github.com/SpatioTemporal/STARE /opt/STARE && \
+    cd /opt/STARE && \
+    mkdir build && \
+    cd build && \
+    cmake -DSTARE_INSTALL_LIBDIR=lib -DBUILD_SHARED_LIBS=NO ../ && \
+    make -j4 && \
+    make install
+
+# Build and install pystare from source
+RUN git -c http.sslVerify=false clone https://github.com/SpatioTemporal/pystare /opt/pystare && \
+    cd /opt/pystare && \
+    python3 setup.py build_ext --inplace && \
+    python3 setup.py bdist_wheel && \
+    python3 setup.py sdist && \
+    pip install . && \
+    rm -rf /opt/pystare
+
+# Install gdal psycopg2 dask from conda-forge
+RUN conda install -c conda-forge gdal psycopg2 dask -y
+
+# Install starepandas from source
+RUN git -c http.sslVerify=false clone https://github.com/SpatioTemporal/STAREPandas /opt/starepandas && \
+    cd /opt/starepandas && \
+    python3 setup.py build_ext --inplace && \
+    python3 setup.py bdist_wheel && \
+    python3 setup.py sdist && \
+    pip install . && \
+    rm -rf /opt/starepandas
+
+# Install staremaster from source
+RUN git -c http.sslVerify=false clone https://github.com/SpatioTemporal/STAREMaster_py /opt/staremaster && \
+    cd /opt/staremaster && \
+    python3 setup.py build_ext --inplace && \
+    python3 setup.py bdist_wheel && \
+    python3 setup.py sdist && \
+    pip install . && \
+    rm -rf /opt/staremaster
+
+# (Optional) Verify installation by printing versions
+RUN python - <<EOF
+import pystare, starepandas, staremaster
+print("pystare:", pystare.__version__)
+print("starepandas:", starepandas.__version__)
+print("staremaster:", staremaster.__version__)
+EOF
+
+# Set working directory
+WORKDIR /workspace
+
+# Default command: open a bash shell
+CMD ["/bin/bash"]
