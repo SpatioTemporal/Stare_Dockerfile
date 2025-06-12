@@ -35,6 +35,18 @@ docker exec -it stare-test /bin/bash
 ```
 
 # II. Build dockerfile on MacOS (M1 -- ARM64)
+### 0. Create a Docker Hub account (if you don't have one)
+- Go to: https://hub.docker.com and sign up a new account
+- Login with docker from command line: 
+```shell
+docker login
+# You’ll see something likes:
+#  Opening login URL in your browser...
+#   If the browser didn't open, visit: https://identity.docker.com/...
+#   And enter the code: ABCD-EFGH
+# Follow the link, login with your docker account, enter the code. Then CLI will print Login Succeeded
+```
+
 ### 1. Build the image
 ```shell
 docker build -f Dockerfile.MacOS -t stare-env-m1:latest .
